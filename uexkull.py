@@ -1,8 +1,19 @@
 import cv2, sys, os, numpy as np
 from pydub import AudioSegment as audio
 
+# Constants
+MIN_SPECTRUM = 380
+MAX_SPECTRUM = 750
+
 def magnitude(complex_val):
     return (complex_val.real**2 + complex_val.imag**2)**(1/2)
+
+def magnitude_mat(mat):
+    mag = np.zeros(mat.shape)
+    for row in range(mat.shape[0]):
+        for col in range(mat.shape[1]):
+            mag[row,col] = magnitude(mat[row,col])
+    return mag
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
     ''' Script to convert wavelength to rgb and frequency to wavelength.
@@ -86,6 +97,15 @@ def range_shift(value, old_min, old_max, target_min, target_max):
     shifted_value = target_min + ( (target_max - target_min) / (old_max - old_min)) * (value - old_min)
     return shifted_value
 
+def range_shift_mat(mat, target_min, target_max):
+    minval = np.min(mat)
+    maxval = np.max(mat)
+    norm = np.zeros((mat.shape[0],mat.shape[1]))
+    for row in range(mat.shape[0]):
+        for col in range(mat.shape[1]):
+            norm[row,col] = range_shift(mat[row, col], minval, maxval, target_min, target_max)
+    return norm
+
 def main():
 
     # Terminal args
@@ -119,18 +139,22 @@ def main():
     MAX_SPECTRUM = 750
     norm_wavelength = np.zeros((height,width))
     rgb = np.zeros((height, width, 3))
-    #r = np.zeros((height, width), np.uint8)
-    #g = np.zeros((height, width), np.uint8)
-    #b = np.zeros((height, width), np.uint8)
+    r = np.zeros((height, width), np.uint8)
+    g = np.zeros((height, width), np.uint8)
+    b = np.zeros((height, width), np.uint8)
     for row in range(height):
         for col in range(width):
             norm_wavelength[row,col] = range_shift(wavelength[row, col], min_wl, max_wl, MIN_SPECTRUM, MAX_SPECTRUM)
             rgb[row, col] = wavelength_to_rgb(norm_wavelength[row, col])
-            #r[row,col], g[row,col], b[row,col] = wavelength_to_rgb(norm_wavelength[row,col])
+            r[row,col], g[row,col], b[row,col] = wavelength_to_rgb(norm_wavelength[row,col])
 
     # Write file
     cv2.imwrite('output_image.jpg', np.uint8(rgb))
 
+    ## Inverse fourier on frequency values
+    #r_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(r))), 0, 255), np.uint8)
+    #g_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(g))), 0, 255), np.uint8)
+    #b_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(b))), 0, 255), np.uint8)
 
 if __name__ == "__main__":
     main()
