@@ -12,6 +12,12 @@ def normalize_wavelength(wavelength):
     wavelength %= 750
     return max(380, wavelength) # has to be a better way!! >~<
 
+def normalize_mat(mat):
+    norm = np.zeros(mat.shape, np.uint8)
+    for row in range(mat.shape[0]):
+        for col in range(mat.shape[1]):
+            norm[row,col] = (mat[row,col] - min(mat)) / (max(mat) - min(mat))
+    return norm
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
     '''
@@ -85,34 +91,80 @@ def main():
     song_file_name = './Music/Math-Emo-Prog/Algernon Cadwallader/Summer Singles (2011)/04 (Na Na Na Na) Simulation.mp3'
     audio_data = load_audio_data(song_file_name)
 
+    output_image_size = (500, 500)
+    values_per_px = len(audio_data) // (output_image_size[0] * output_image_size[1])
 
-    # Convert data from array to square matrix
-    audio_data_mat = song_to_mat(audio_data)
+    # Init image
+    output_image = np.array(output_image_size, np.uint8)
+    for i in range(0, len(audio_data), values_per_px):
+        total = 0
+        for j in range(values_per_px):
+            total += audio_data[i+j]
+        mean = total // values_per_px
+        if i + values_per_px >= len(audio_data):
+            break
 
-    # DFT on data
-    dft_mat = np.array(np.fft.fft2(audio_data_mat), np.uint8)
 
-    wavelength_data = np.zeros(dft_mat.shape, np.uint8)
-    rgb_image = np.zeros([dft_mat.shape[0], dft_mat.shape[1], 3], np.uint8)
+    ## Convert data from array to square matrix
+    #audio_data_mat = song_to_mat(audio_data)
 
-    # Convert frequency to wavelength
-    for row in range(dft_mat.shape[0]):
-        for col in range(dft_mat.shape[1]):
-            wavelength_data[row,col] = frequency_to_wavelength(dft_mat[row,col])
-            #print(wavelength_to_rgb(wavelength_data[row,col]))
-            rgb_image[row,col] = wavelength_to_rgb(normalize_wavelength(wavelength_data[row,col]))
+    ## Perform DFT on data
+    #dft_mat = np.array(np.fft.fft2(audio_data_mat), np.uint8)
+    #dft_mat = np.fft.fftshift(dft_mat)
 
-    cv2.imshow('dft_mat',dft_mat)
-    cv2.imshow('wavelength_data',wavelength_data)
-    cv2.imshow('rgb',rgb_image)
-    cv2.waitKey()
-    cv2.destroyWindow('dft_mat')
-    cv2.destroyWindow('wavelength_data')
-    cv2.destroyWindow('rgb')
+    #wavelength_data = np.zeros(dft_mat.shape, np.uint8)
+    ##rgb_image = np.zeros([dft_mat.shape[0], dft_mat.shape[1], 3], np.uint8)
+
+    ### Convert frequency to wavelength
+    #for row in range(dft_mat.shape[0]):
+    #    for col in range(dft_mat.shape[1]):
+    #        wavelength_data[row,col] = frequency_to_wavelength(dft_mat[row,col])
+    ##        #print(wavelength_to_rgb(wavelength_data[row,col]))
+    ##        #rgb_image[row,col] = wavelength_to_rgb(normalize_wavelength(wavelength_data[row,col]))
+
+    #result = normalize_mat(wavelength_data)
+
+    #ifft = np.fft.ifftshift(result)
+    #ifft = np.fft.ifft2(ifft)
+
+    #print(ifft)
+    #cv2.imshow('img',ifft)
+    #cv2.imwrite('heyhey.jpg',ifft)
+    #cv2.waitKey()
+    #cv2.destroyWindow('img')
+
+
+    ##cv2.imshow('dft_mat',dft_mat)
+    ##cv2.imshow('wavelength_data',wavelength_data)
+    ##cv2.imshow('rgb',rgb_image)
+    ##cv2.waitKey()
+    ##cv2.destroyWindow('dft_mat')
+    ##cv2.destroyWindow('wavelength_data')
+    ##cv2.destroyWindow('rgb')
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
