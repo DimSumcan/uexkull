@@ -1,52 +1,36 @@
-import cv2
-import numpy as np
+import cv2, sys, os, numpy as np
 from pydub import AudioSegment as audio
 
 def magnitude(complex_val):
     return (complex_val.real**2 + complex_val.imag**2)**(1/2)
 
-def normalize_wavelength(wavelength):
-    '''
-    "Normalize" wavelength to be in range 380 -> 750
-    '''
-    wavelength %= 750
-    return max(380, wavelength) # has to be a better way!! >~<
-
-def normalize_mat(mat):
-    norm = np.zeros(mat.shape, np.uint8)
-    for row in range(mat.shape[0]):
-        for col in range(mat.shape[1]):
-            norm[row,col] = (mat[row,col] - min(mat)) / (max(mat) - min(mat))
-    return norm
-
 def wavelength_to_rgb(wavelength, gamma=0.8):
-    '''
-    Script to convert wavelength to rgb and frequency to wavelength.
+    ''' Script to convert wavelength to rgb and frequency to wavelength.
     Adapted to python from R source here:
     https://gist.github.com/friendly/67a7df339aa999e2bcfcfec88311abfc
     '''
-    if wavelength >= 380 & wavelength <= 440:
+    if wavelength >= 380 and wavelength <= 440:
         attenuation = 0.3 + 0.7 * (wavelength - 380) / (440 - 380)
         R = ((-(wavelength - 440) / (440 - 380)) * attenuation) ** gamma
         G = 0.0
         B = (1.0 * attenuation) ** gamma
-    elif wavelength >= 440 & wavelength <= 490:
+    elif wavelength >= 440 and wavelength <= 490:
         R = 0.0
         G = ((wavelength - 440) / (490 - 440)) ** gamma
         B = 1.0
-    elif wavelength >= 490 & wavelength <= 510:
+    elif wavelength >= 490 and wavelength <= 510:
         R = 0.0
         G = 1.0
         B = (-(wavelength - 510) / (510 - 490)) ** gamma
-    elif wavelength >= 510 & wavelength <= 580:
+    elif wavelength >= 510 and wavelength <= 580:
         R = ((wavelength - 510) / (580 - 510)) ** gamma
         G = 1.0
         B = 0.0
-    elif wavelength >= 580 & wavelength <= 645:
+    elif wavelength >= 580 and wavelength <= 645:
         R = 1.0
         G = (-(wavelength - 645) / (645 - 580)) ** gamma
         B = 0.0
-    elif wavelength >= 645 & wavelength <= 750:
+    elif wavelength >= 645 and wavelength <= 750:
         attenuation = 0.3 + 0.7 * (750 - wavelength) / (750 - 645)
         R = (1.0 * attenuation) ** gamma
         G = 0.0
@@ -56,7 +40,7 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
         G = 0.0
         B = 0.0
 
-    return  magnitude(R) % 255, magnitude(G) % 255, magnitude(B) % 255
+    return  255* (magnitude(R) % 255), 255 * (magnitude(G) % 255), 255 * (magnitude(B) % 255)
 
 def frequency_to_wavelength(frequency):
     '''
@@ -86,68 +70,70 @@ def song_to_mat(int_data):
 
     return square_mat
 
+def get_dft_from_1d_data(data):
+    dft = np.fft.fft(data)
+    dft_shift = np.fft.fftshift(dft)
+    return dft_shift
+
+def get_image_from_2d_dft(dft_data):
+    dft_inv_shift = np.fft.ifftshift(dft_data)
+    return np.array(np.fft.ifft2(dft_data))
+
+def range_shift(value, old_min, old_max, target_min, target_max):
+    '''
+    Shifts "value" to from range [old_min, old_max] to [target_min, target_max]
+    '''
+    shifted_value = target_min + ( (target_max - target_min) / (old_max - old_min)) * (value - old_min)
+    return shifted_value
+
 def main():
+
+    # Terminal args
+    if len(sys.argv) < 4:
+        print("Usage: {} <song file> <output image height> <output image width>".format(sys.argv[0]))
+        sys.exit(1)
+    song_file = sys.argv[1]
+    height = int(sys.argv[2])
+    width = int(sys.argv[3])
+    output_file_name = "{}.jpg".format(os.path.splitext(song_file)[0][:len(song_file)-4])
+
     # Load audio data from file
-    song_file_name = './Music/Math-Emo-Prog/Algernon Cadwallader/Summer Singles (2011)/04 (Na Na Na Na) Simulation.mp3'
-    audio_data = load_audio_data(song_file_name)
+    audio_data = load_audio_data(song_file)
 
-    output_image_size = (500, 500)
-    values_per_px = len(audio_data) // (output_image_size[0] * output_image_size[1])
+    # Get dft -- 1D
+    audio_dft = np.array(get_dft_from_1d_data(audio_data), np.uint8)
 
-    # Init image
-    output_image = np.array(output_image_size, np.uint8)
-    for i in range(0, len(audio_data), values_per_px):
-        total = 0
-        for j in range(values_per_px):
-            total += audio_data[i+j]
-        mean = total // values_per_px
-        if i + values_per_px >= len(audio_data):
-            break
+    # Get wavelength info from audio frequency -- 2D
+    wavelength = np.zeros((height,width), np.uint8)
+    for row in range(height):
+        for col in range(width):
+            #wl = frequency_to_wavelength(audio_dft[row*col])
+            #range_adjusted_wl = 
+            wavelength[row,col] = frequency_to_wavelength(audio_dft[row*col])
 
+    # 1. Adjust wavelengths range from [min_wl, max_wl] to [380, 750]
+    # 2. Get rgb values
+    min_wl = np.min(wavelength)
+    max_wl = np.max(wavelength)
+    MIN_SPECTRUM = 380
+    MAX_SPECTRUM = 750
+    norm_wavelength = np.zeros((height,width))
+    rgb = np.zeros((height, width, 3))
+    #r = np.zeros((height, width), np.uint8)
+    #g = np.zeros((height, width), np.uint8)
+    #b = np.zeros((height, width), np.uint8)
+    for row in range(height):
+        for col in range(width):
+            norm_wavelength[row,col] = range_shift(wavelength[row, col], min_wl, max_wl, MIN_SPECTRUM, MAX_SPECTRUM)
+            rgb[row, col] = wavelength_to_rgb(norm_wavelength[row, col])
+            #r[row,col], g[row,col], b[row,col] = wavelength_to_rgb(norm_wavelength[row,col])
 
-    ## Convert data from array to square matrix
-    #audio_data_mat = song_to_mat(audio_data)
-
-    ## Perform DFT on data
-    #dft_mat = np.array(np.fft.fft2(audio_data_mat), np.uint8)
-    #dft_mat = np.fft.fftshift(dft_mat)
-
-    #wavelength_data = np.zeros(dft_mat.shape, np.uint8)
-    ##rgb_image = np.zeros([dft_mat.shape[0], dft_mat.shape[1], 3], np.uint8)
-
-    ### Convert frequency to wavelength
-    #for row in range(dft_mat.shape[0]):
-    #    for col in range(dft_mat.shape[1]):
-    #        wavelength_data[row,col] = frequency_to_wavelength(dft_mat[row,col])
-    ##        #print(wavelength_to_rgb(wavelength_data[row,col]))
-    ##        #rgb_image[row,col] = wavelength_to_rgb(normalize_wavelength(wavelength_data[row,col]))
-
-    #result = normalize_mat(wavelength_data)
-
-    #ifft = np.fft.ifftshift(result)
-    #ifft = np.fft.ifft2(ifft)
-
-    #print(ifft)
-    #cv2.imshow('img',ifft)
-    #cv2.imwrite('heyhey.jpg',ifft)
-    #cv2.waitKey()
-    #cv2.destroyWindow('img')
-
-
-    ##cv2.imshow('dft_mat',dft_mat)
-    ##cv2.imshow('wavelength_data',wavelength_data)
-    ##cv2.imshow('rgb',rgb_image)
-    ##cv2.waitKey()
-    ##cv2.destroyWindow('dft_mat')
-    ##cv2.destroyWindow('wavelength_data')
-    ##cv2.destroyWindow('rgb')
+    # Write file
+    cv2.imwrite('output_image.jpg', np.uint8(rgb))
 
 
 if __name__ == "__main__":
     main()
-
-
-
 
 
 
