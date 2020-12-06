@@ -5,6 +5,18 @@ from pydub import AudioSegment as audio
 MIN_SPECTRUM = 380
 MAX_SPECTRUM = 750
 
+def fft_1d(mat):
+    return np.abs(np.fft.fftshift(np.fft.fft(mat)))
+
+def fft_2d(mat):
+    return np.abs(np.fft.fftshift(np.fft.fft2(mat)))
+
+def ifft_1d(mat):
+    return np.abs(np.fft.ifft(np.fft.ifftshift(mat)))
+
+def ifft_2d(mat):
+    return np.abs(np.fft.ifft2(np.fft.ifftshift(mat)))
+
 def magnitude(complex_val):
     return (complex_val.real**2 + complex_val.imag**2)**(1/2)
 
@@ -14,6 +26,12 @@ def magnitude_mat(mat):
         for col in range(mat.shape[1]):
             mag[row,col] = magnitude(mat[row,col])
     return mag
+
+def print_mat_stats(mat):
+    print("Median: {}".format(np.median(mat)))
+    print("Mean: {}".format(np.mean(mat)))
+    print("Min: {}".format(np.min(mat)))
+    print("Max: {}".format(np.max(mat)))
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
     ''' Script to convert wavelength to rgb and frequency to wavelength.
@@ -124,50 +142,38 @@ def main():
     audio_dft = np.array(get_dft_from_1d_data(audio_data), np.uint8)
 
     # Get wavelength info from audio frequency -- 2D
+    # Account for image size being smaller than data array
     wavelength = np.zeros((height,width), np.uint8)
-    for row in range(height):
-        for col in range(width):
-            #wl = frequency_to_wavelength(audio_dft[row*col])
-            #range_adjusted_wl = 
-            wavelength[row,col] = frequency_to_wavelength(audio_dft[row*col])
+    step_size = audio_dft.size // (height*width)
+    n_step = 0
+    for i in range(height):
+        for j in range(width):
+            step_total = 0
+            #step_median = np.median(audio_dft[n_step:n_step+step_size])
+            #wavelength[i,j] = frequency_to_wavelength(step_median)
+            step_mean = np.mean(audio_dft[n_step:n_step+step_size])
+            wavelength[i,j] = frequency_to_wavelength(step_mean)
+            n_step += step_size
 
-    # 1. Adjust wavelengths range from [min_wl, max_wl] to [380, 750]
-    # 2. Get rgb values
-    min_wl = np.min(wavelength)
-    max_wl = np.max(wavelength)
-    MIN_SPECTRUM = 380
-    MAX_SPECTRUM = 750
-    norm_wavelength = np.zeros((height,width))
+    # Normalize wavelengths from [min_wl, max_wl] to [380, 750]
+    norm_wavelength = range_shift_mat(wavelength, MIN_SPECTRUM, MAX_SPECTRUM)
+
+    # Get rgb values
     rgb = np.zeros((height, width, 3))
-    r = np.zeros((height, width), np.uint8)
-    g = np.zeros((height, width), np.uint8)
-    b = np.zeros((height, width), np.uint8)
-    for row in range(height):
-        for col in range(width):
-            norm_wavelength[row,col] = range_shift(wavelength[row, col], min_wl, max_wl, MIN_SPECTRUM, MAX_SPECTRUM)
-            rgb[row, col] = wavelength_to_rgb(norm_wavelength[row, col])
-            r[row,col], g[row,col], b[row,col] = wavelength_to_rgb(norm_wavelength[row,col])
+    r = np.zeros((height, width))
+    g = np.zeros((height, width))
+    b = np.zeros((height, width))
+    for i in range(height):
+        for j in range(width):
+            r[i,j], g[i,j], b[i,j] = wavelength_to_rgb(norm_wavelength[i,j])
+            rgb[i, j] = r[i,j], g[i,j], b[i,j]
 
-    # Write file
-    cv2.imwrite('output_image.jpg', np.uint8(rgb))
+    # Write rgb file
+    cv2.imwrite('output_image.jpg', rgb)
 
-    ## Inverse fourier on frequency values
-    #r_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(r))), 0, 255), np.uint8)
-    #g_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(g))), 0, 255), np.uint8)
-    #b_out = np.array(range_shift_mat(magnitude_mat(np.fft.ifft2(np.fft.ifftshift(b))), 0, 255), np.uint8)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
 
 
 
